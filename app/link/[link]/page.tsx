@@ -1,24 +1,29 @@
 import LinkClient from "@/components/LinkClient";
 import { paths } from "@/utils/paths";
-import { FC } from "react";
-
 interface LinkPageProps {
-  params: { link: string }; // Obtiene el parámetro dinámico de la URL
+  params: Promise<{ link: string }>;
 }
 
 export async function generateStaticParams() {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}${paths.link.getAll}`
-  );
-  const data = await response.json();
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}${paths.link.getAll}`
+    );
+    if (!response.ok) throw new Error("Error al obtener links");
 
-  return data.links.map((link: { url: string }) => ({
-    link: link.url,
-  }));
+    const data = await response.json();
+
+    return data.links.map((link: { url: string }) => ({
+      link: link.url,
+    }));
+  } catch (error) {
+    console.error("Error en generateStaticParams:", error);
+    return []; 
+  }
 }
 
-const LinkPage: FC<LinkPageProps> = async ({ params }) => {
-  const { link } = params;
+export default async function Page({ params }: LinkPageProps) {
+  const { link } = await params;
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_BASE_URL}${paths.link.get}${link}`,
@@ -29,10 +34,12 @@ const LinkPage: FC<LinkPageProps> = async ({ params }) => {
       throw new Error(`Error al obtener datos: ${res.status}`);
     }
 
-    const data: {link?:string, file?:string, password?:string} = await res.json();
+    const data: { link?: string; file?: string; password?: string } =
+      await res.json();
 
-    return <LinkClient link={data.link} file={data.file} password={data.password} />;
-
+    return (
+      <LinkClient link={data.link} file={data.file} password={data.password} />
+    );
   } catch (error) {
     console.error("API Request Error:", error);
     return (
@@ -41,6 +48,4 @@ const LinkPage: FC<LinkPageProps> = async ({ params }) => {
       </p>
     );
   }
-};
-
-export default LinkPage;
+}
